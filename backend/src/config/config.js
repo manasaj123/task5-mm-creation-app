@@ -1,5 +1,5 @@
 export const config = {
-  port: process.env.PORT || 5000,
+  port: process.env.PORT || 5002,
   db: {
     host: process.env.DB_HOST || "localhost",
     user: process.env.DB_USER || "root",

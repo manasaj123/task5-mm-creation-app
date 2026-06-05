@@ -9,6 +9,13 @@ import stockRoutes from "./routes/stockRoutes.js";
 import invoiceRoutes from "./routes/invoiceRoutes.js";
 import { notFound, errorHandler } from "./middleware/errorHandler.js";
 import stockTransferRoutes from "./routes/stockTransferRoutes.js";
+import rfqRoutes from "./routes/rfqRoutes.js";
+
+// import grRoutes from "./routes/grRoutes.js";
+import giRoutes from "./routes/giRoutes.js";
+
+
+
 
 const app = express();
 
@@ -27,6 +34,9 @@ app.use("/api/grn", grnRoutes);
 app.use("/api/stock", stockRoutes);
 app.use("/api/invoices", invoiceRoutes);
 app.use("/api/stock-transfer", stockTransferRoutes);
+app.use("/api/rfq", rfqRoutes);
+// app.use("/api/gr", grRoutes);
+app.use("/api/gi", giRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

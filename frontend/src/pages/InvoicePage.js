@@ -21,7 +21,8 @@ const cardStyle = {
 const formRowStyle = {
   display: "flex",
   gap: "8px",
-  marginBottom: "8px"
+  marginBottom: "8px",
+  flexWrap: "wrap"
 };
 
 const labelStyle = {
@@ -29,7 +30,8 @@ const labelStyle = {
   flexDirection: "column",
   fontSize: "12px",
   color: "#4b5563",
-  flex: 1
+  flex: 1,
+  minWidth: "160px"
 };
 
 const inputStyle = {
@@ -79,10 +81,12 @@ export default function InvoicePage() {
     invoice_date: "",
     vendor_id: "",
     po_id: "",
-    total_amount: ""
+    total_amount: "",
+    invoice_type: "INVOICE",
+    gr_based: true,
+    payment_blocked: false
   });
 
-  // line items state
   const [items, setItems] = useState([
     { po_item_id: "", material_id: "", qty: "", price: "", tax_percent: "" }
   ]);
@@ -115,8 +119,11 @@ export default function InvoicePage() {
   }, []);
 
   const handleHeaderChange = (e) => {
-    const { name, value } = e.target;
-    setHeader((h) => ({ ...h, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setHeader((h) => ({
+      ...h,
+      [name]: type === "checkbox" ? checked : value
+    }));
   };
 
   const handleItemChange = (index, field, value) => {
@@ -132,7 +139,6 @@ export default function InvoicePage() {
     ]);
   };
 
-  
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -141,7 +147,7 @@ export default function InvoicePage() {
           ...header,
           vendor_id: Number(header.vendor_id),
           po_id: header.po_id ? Number(header.po_id) : null,
-          total_amount: Number(header.total_amount)
+          total_amount: Number(header.total_amount) || 0
         },
         items: items
           .filter((it) => it.material_id && it.qty && it.price)
@@ -155,14 +161,18 @@ export default function InvoicePage() {
           }))
       };
 
-      await invoiceApi.create(payload);
+      const res = await invoiceApi.create(payload);
+      alert(`Invoice saved: ${res.data.invoice_no} (${res.data.status})`);
 
       setHeader({
         invoice_no: "",
         invoice_date: "",
         vendor_id: "",
         po_id: "",
-        total_amount: ""
+        total_amount: "",
+        invoice_type: "INVOICE",
+        gr_based: true,
+        payment_blocked: false
       });
       setItems([
         { po_item_id: "", material_id: "", qty: "", price: "", tax_percent: "" }
@@ -170,6 +180,7 @@ export default function InvoicePage() {
       await loadInvoices();
     } catch (e) {
       console.error(e);
+      alert("Error saving invoice");
     }
   };
 
@@ -184,10 +195,8 @@ export default function InvoicePage() {
               Invoice No
               <input
                 style={inputStyle}
-                name="invoice_no"
-                value={header.invoice_no}
-                onChange={handleHeaderChange}
-                required
+                value={header.invoice_no || "Auto Generated"}
+                disabled
               />
             </label>
             <label style={labelStyle}>
@@ -247,6 +256,42 @@ export default function InvoicePage() {
                 onChange={handleHeaderChange}
               />
             </label>
+            <label style={labelStyle}>
+              Invoice Type
+              <select
+                style={inputStyle}
+                name="invoice_type"
+                value={header.invoice_type}
+                onChange={handleHeaderChange}
+              >
+                <option value="INVOICE">Invoice</option>
+                <option value="CREDIT_NOTE">Credit Note</option>
+                <option value="DEBIT_NOTE">Debit Note</option>
+              </select>
+            </label>
+          </div>
+
+          <div style={formRowStyle}>
+            <label style={{ ...labelStyle, flexDirection: "row", alignItems: "center" }}>
+              <input
+                type="checkbox"
+                name="gr_based"
+                checked={header.gr_based}
+                onChange={handleHeaderChange}
+                style={{ marginRight: "6px" }}
+              />
+              GR-based Invoice Verification
+            </label>
+            <label style={{ ...labelStyle, flexDirection: "row", alignItems: "center" }}>
+              <input
+                type="checkbox"
+                name="payment_blocked"
+                checked={header.payment_blocked}
+                onChange={handleHeaderChange}
+                style={{ marginRight: "6px" }}
+              />
+              Manual Payment Block
+            </label>
           </div>
 
           <div
@@ -273,16 +318,17 @@ export default function InvoicePage() {
                 />
               </label>
               <label style={labelStyle}>
-                Material Id
-                <input
-                  style={inputStyle}
-                  value={it.material_id}
-                  onChange={(e) =>
-                    handleItemChange(idx, "material_id", e.target.value)
-                  }
-                  required
-                />
-              </label>
+  Material Id
+  <input
+  style={inputStyle}
+  value={it.material_id}
+  onChange={(e) =>
+    handleItemChange(idx, "material_id", e.target.value)
+  }
+  required={!it.po_item_id}   // ✅ KEY FIX
+/>
+</label>
+
               <label style={labelStyle}>
                 Qty
                 <input
@@ -318,13 +364,12 @@ export default function InvoicePage() {
                   }
                 />
               </label>
-              
             </div>
           ))}
 
           <button
             type="button"
-            style={{ ...buttonStyle, backgroundColor: "#6b7280",marginRight:"8px" }}
+            style={{ ...buttonStyle, backgroundColor: "#6b7280", marginRight: "8px" }}
             onClick={addItemRow}
           >
             + Add Line
@@ -357,7 +402,9 @@ export default function InvoicePage() {
                 <th style={thStyle}>Vendor</th>
                 <th style={thStyle}>PO</th>
                 <th style={thStyle}>Total</th>
+                <th style={thStyle}>Type</th>
                 <th style={thStyle}>Status</th>
+                <th style={thStyle}>Payment Blocked</th>
               </tr>
             </thead>
             <tbody>
@@ -368,7 +415,9 @@ export default function InvoicePage() {
                   <td style={tdStyle}>{inv.vendor_name}</td>
                   <td style={tdStyle}>{inv.po_no}</td>
                   <td style={tdStyle}>{inv.total_amount}</td>
+                  <td style={tdStyle}>{inv.invoice_type}</td>
                   <td style={tdStyle}>{inv.status}</td>
+                  <td style={tdStyle}>{inv.payment_blocked ? "Yes" : "No"}</td>
                 </tr>
               ))}
             </tbody>

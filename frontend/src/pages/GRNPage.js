@@ -7,7 +7,7 @@ const titleStyle = {
   fontSize: "18px",
   fontWeight: "600",
   marginBottom: "12px",
-  color: "#111827"
+  color: "#111827",
 };
 
 const cardStyle = {
@@ -15,14 +15,14 @@ const cardStyle = {
   borderRadius: "6px",
   padding: "16px",
   boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-  marginBottom: "16px"
+  marginBottom: "16px",
 };
 
 const formRowStyle = {
   display: "flex",
   gap: "8px",
   marginBottom: "8px",
-   flexWrap: "wrap"
+  flexWrap: "wrap",
 };
 
 const labelStyle = {
@@ -30,14 +30,29 @@ const labelStyle = {
   flexDirection: "column",
   fontSize: "12px",
   color: "#4b5563",
-  flex: 1
+  flex: 1,
+  minWidth: "160px",
 };
 
 const inputStyle = {
   padding: "6px 8px",
   fontSize: "13px",
   borderRadius: "4px",
-  border: "1px solid #d1d5db"
+  border: "1px solid #d1d5db",
+};
+
+const inputErrorStyle = {
+  padding: "6px 8px",
+  fontSize: "13px",
+  borderRadius: "4px",
+  border: "2px solid #dc2626",
+  backgroundColor: "#fef2f2",
+};
+
+const errorTextStyle = {
+  color: "#dc2626",
+  fontSize: "11px",
+  marginTop: "4px",
 };
 
 const buttonStyle = {
@@ -48,24 +63,86 @@ const buttonStyle = {
   border: "none",
   backgroundColor: "#2563eb",
   color: "#ffffff",
-  cursor: "pointer"
+  cursor: "pointer",
+};
+
+const secondaryButtonStyle = {
+  ...buttonStyle,
+  backgroundColor: "#6b7280",
+  marginLeft: "8px",
+};
+
+const tableStyle = {
+  width: "100%",
+  borderCollapse: "collapse",
+  fontSize: "13px",
+  marginTop: "12px",
+};
+
+const thStyle = {
+  backgroundColor: "#e5e7eb",
+  padding: "6px",
+  border: "1px solid #d1d5db",
+  textAlign: "left",
+};
+
+const tdStyle = {
+  padding: "6px",
+  border: "1px solid #e5e7eb",
+};
+
+const smallBtn = {
+  padding: "4px 8px",
+  fontSize: "12px",
+  borderRadius: "4px",
+  border: "none",
+  cursor: "pointer",
+  marginRight: "4px",
+};
+
+// Get today's date in YYYY-MM-DD format
+const getTodayDate = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+// Convert date to local YYYY-MM-DD without timezone offset
+const toLocalDateString = (date) => {
+  if (!date) return "";
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "";
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 };
 
 export default function GRNPage() {
   const [poList, setPoList] = useState([]);
+  const [grns, setGrns] = useState([]);
   const [selectedPoId, setSelectedPoId] = useState("");
-  
   const [vendors, setVendors] = useState([]);
+  const [editingId, setEditingId] = useState(null);
+  const [errors, setErrors] = useState({});
 
   const [header, setHeader] = useState({
     grn_no: "",
     grn_date: "",
     vendor_id: "",
     po_id: "",
-    location_id: 1
+    location_id: 1,
+    status: "POSTED",
   });
 
   const [items, setItems] = useState([]);
+
+  const toInputDate = (value) => {
+    if (!value) return "";
+    return String(value).split("T")[0];
+  };
 
   const loadPOs = async () => {
     try {
@@ -85,27 +162,95 @@ export default function GRNPage() {
     }
   };
 
+  const loadGRNs = async () => {
+    try {
+      const res = await grnApi.getAll();
+      setGrns(res.data);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   useEffect(() => {
     loadPOs();
     loadVendors();
+    loadGRNs();
   }, []);
+
+  const resetForm = () => {
+    setEditingId(null);
+    setErrors({});
+    setHeader({
+      grn_no: "",
+      grn_date: "",
+      vendor_id: "",
+      po_id: "",
+      location_id: 1,
+      status: "POSTED",
+    });
+    setItems([]);
+    setSelectedPoId("");
+  };
+
+  // Validation functions
+  const validateNoSpecialChars = (value, fieldName) => {
+    if (!value) return "";
+    const regex = /^[A-Za-z0-9\s-]+$/;
+    if (!regex.test(value)) {
+      return `${fieldName} should only contain letters, numbers, spaces and hyphens`;
+    }
+    return "";
+  };
+
+  const validateNotPastDate = (date, fieldName) => {
+    if (!date) return "";
+    const selectedDate = new Date(date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    selectedDate.setHours(0, 0, 0, 0);
+
+    if (selectedDate < today) {
+      return `${fieldName} cannot be a past date`;
+    }
+    return "";
+  };
+
+  const validateExpiryDate = (expiryDate, mfgDate, fieldName) => {
+    if (!expiryDate) return "";
+    if (mfgDate && expiryDate < mfgDate) {
+      return "Expiry Date cannot be before Manufacturing Date";
+    }
+    return "";
+  };
+
+  const validateQuantity = (qty, fieldName) => {
+    if (!qty && qty !== 0) return "";
+    const num = Number(qty);
+    if (isNaN(num)) return `${fieldName} must be a number`;
+    if (num < 0) return `${fieldName} cannot be negative`;
+    return "";
+  };
 
   const handleSelectPO = async (poId) => {
     setSelectedPoId(poId);
+    setErrors({});
     if (!poId) {
-      
       setItems([]);
+      setHeader((h) => ({ ...h, po_id: "", vendor_id: "" }));
       return;
     }
     const res = await poApi.getById(poId);
-    
+    const poHeader = res.data.header;
+    const poItems = res.data.items || [];
+
     setHeader((h) => ({
       ...h,
       po_id: poId,
-      vendor_id: res.data.header.vendor_id
+      vendor_id: poHeader.vendor_id,
     }));
+
     setItems(
-      (res.data.items || []).map((it) => ({
+      poItems.map((it) => ({
         po_item_id: it.id,
         material_id: it.material_id,
         received_qty: it.qty,
@@ -114,51 +259,263 @@ export default function GRNPage() {
         batch_no: "",
         mfg_date: "",
         expiry_date: "",
-        unit_cost: it.price
-      }))
+        unit_cost: it.price,
+      })),
     );
   };
 
   const handleHeaderChange = (e) => {
     const { name, value } = e.target;
     setHeader((h) => ({ ...h, [name]: value }));
+
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: "" }));
+    }
   };
 
   const handleItemChange = (index, field, value) => {
+    let processedValue = value;
+
+    if (field === "batch_no") {
+      processedValue = value.replace(/[^A-Za-z0-9\s-]/g, "");
+    }
+
+    // Auto-calculate rejected quantity when accepted changes
+    if (field === "accepted_qty") {
+      const received = Number(items[index]?.received_qty) || 0;
+      const accepted = Number(value) || 0;
+      const rejected = received - accepted;
+
+      setItems((prev) =>
+        prev.map((it, i) =>
+          i === index
+            ? {
+                ...it,
+                accepted_qty: processedValue,
+                rejected_qty: rejected >= 0 ? rejected : 0,
+              }
+            : it,
+        ),
+      );
+
+      // Clear related errors
+      if (errors[`item_${index}_accepted_qty`]) {
+        setErrors((prev) => ({ ...prev, [`item_${index}_accepted_qty`]: "" }));
+      }
+      if (errors[`item_${index}_rejected_qty`]) {
+        setErrors((prev) => ({ ...prev, [`item_${index}_rejected_qty`]: "" }));
+      }
+      return;
+    }
+
+    // Auto-calculate accepted quantity when rejected changes
+    if (field === "rejected_qty") {
+      const received = Number(items[index]?.received_qty) || 0;
+      const rejected = Number(value) || 0;
+      const accepted = received - rejected;
+
+      setItems((prev) =>
+        prev.map((it, i) =>
+          i === index
+            ? {
+                ...it,
+                rejected_qty: processedValue,
+                accepted_qty: accepted >= 0 ? accepted : 0,
+              }
+            : it,
+        ),
+      );
+
+      // Clear related errors
+      if (errors[`item_${index}_accepted_qty`]) {
+        setErrors((prev) => ({ ...prev, [`item_${index}_accepted_qty`]: "" }));
+      }
+      if (errors[`item_${index}_rejected_qty`]) {
+        setErrors((prev) => ({ ...prev, [`item_${index}_rejected_qty`]: "" }));
+      }
+      return;
+    }
+
     setItems((prev) =>
-      prev.map((it, i) => (i === index ? { ...it, [field]: value } : it))
+      prev.map((it, i) =>
+        i === index ? { ...it, [field]: processedValue } : it,
+      ),
     );
+
+    // Clear error for this item field
+    if (errors[`item_${index}_${field}`]) {
+      setErrors((prev) => ({ ...prev, [`item_${index}_${field}`]: "" }));
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+
+    // Validate GRN Date
+    if (!header.grn_date) {
+      newErrors.grn_date = "GRN Date is required";
+    } else {
+      const pastDateError = validateNotPastDate(header.grn_date, "GRN Date");
+      if (pastDateError) newErrors.grn_date = pastDateError;
+    }
+
+    // Validate items
+    items.forEach((item, idx) => {
+      // Validate received quantity
+      const receivedQtyError = validateQuantity(
+        item.received_qty,
+        "Received Qty",
+      );
+      if (receivedQtyError)
+        newErrors[`item_${idx}_received_qty`] = receivedQtyError;
+
+      // Validate accepted quantity
+      const acceptedQtyError = validateQuantity(
+        item.accepted_qty,
+        "Accepted Qty",
+      );
+      if (acceptedQtyError)
+        newErrors[`item_${idx}_accepted_qty`] = acceptedQtyError;
+
+      // Validate rejected quantity
+      const rejectedQtyError = validateQuantity(
+        item.rejected_qty,
+        "Rejected Qty",
+      );
+      if (rejectedQtyError)
+        newErrors[`item_${idx}_rejected_qty`] = rejectedQtyError;
+
+      // Validate that accepted + rejected = received (with tolerance)
+      const received = Number(item.received_qty) || 0;
+      const accepted = Number(item.accepted_qty) || 0;
+      const rejected = Number(item.rejected_qty) || 0;
+
+      if (Math.abs(accepted + rejected - received) > 0.01) {
+        newErrors[`item_${idx}_qty_sum`] =
+          `Accepted (${accepted}) + Rejected (${rejected}) must equal Received (${received})`;
+      }
+
+      // Validate batch number (no special characters)
+      if (item.batch_no) {
+        const batchError = validateNoSpecialChars(item.batch_no, "Batch No");
+        if (batchError) newErrors[`item_${idx}_batch_no`] = batchError;
+      }
+
+      // Validate manufacturing date not past
+      if (item.mfg_date) {
+        const pastDateError = validateNotPastDate(
+          item.mfg_date,
+          "Manufacturing Date",
+        );
+        if (pastDateError) newErrors[`item_${idx}_mfg_date`] = pastDateError;
+      }
+
+      // Validate expiry date not past and not before mfg date
+      if (item.expiry_date) {
+        const pastDateError = validateNotPastDate(
+          item.expiry_date,
+          "Expiry Date",
+        );
+        if (pastDateError) {
+          newErrors[`item_${idx}_expiry_date`] = pastDateError;
+        } else {
+          const expiryError = validateExpiryDate(
+            item.expiry_date,
+            item.mfg_date,
+            "Expiry Date",
+          );
+          if (expiryError) newErrors[`item_${idx}_expiry_date`] = expiryError;
+        }
+      }
+
+      // Validate unit cost
+      if (item.unit_cost && Number(item.unit_cost) < 0) {
+        newErrors[`item_${idx}_unit_cost`] = "Unit Cost cannot be negative";
+      }
+    });
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!validateForm()) {
+      alert("Please fix the validation errors before submitting");
+      return;
+    }
+
     try {
       const payload = {
-        header,
+        header: {
+          ...header,
+          grn_date: header.grn_date,
+        },
         items: items.map((it) => ({
           ...it,
           received_qty: Number(it.received_qty),
           accepted_qty: Number(it.accepted_qty),
           rejected_qty: Number(it.rejected_qty),
-          unit_cost: Number(it.unit_cost)
-        }))
+          unit_cost: Number(it.unit_cost),
+        })),
       };
-      await grnApi.create(payload);
-      alert("GRN saved");
-      setHeader({
-        grn_no: "",
-        grn_date: "",
-        vendor_id: "",
-        po_id: "",
-        location_id: 1
-      });
-      setItems([]);
-      setSelectedPoId("");
-      
+
+      if (editingId) {
+        await grnApi.update(editingId, payload);
+        alert("GRN updated");
+      } else {
+        const res = await grnApi.create(payload);
+        alert(`GRN saved : ${res.data.grn_no}`);
+      }
+
+      resetForm();
+      loadGRNs();
     } catch (e) {
       console.error(e);
       alert("Error saving GRN");
     }
+  };
+
+  const handleEdit = async (grn) => {
+    setEditingId(grn.id);
+    setErrors({});
+    const res = await grnApi.getById(grn.id);
+    const { header: h, items: its } = res.data;
+
+    setHeader({
+      grn_no: h.grn_no,
+      grn_date: toLocalDateString(h.grn_date),
+      vendor_id: h.vendor_id,
+      po_id: h.po_id,
+      location_id: h.location_id,
+      status: h.status || "POSTED",
+    });
+    setSelectedPoId(String(h.po_id || ""));
+    setItems(
+      (its || []).map((it) => ({
+        po_item_id: it.po_item_id,
+        material_id: it.material_id,
+        received_qty: String(it.received_qty),
+        accepted_qty: String(it.accepted_qty),
+        rejected_qty: String(it.rejected_qty),
+        batch_no: it.batch_no || "",
+        mfg_date: toLocalDateString(it.mfg_date),
+        expiry_date: toLocalDateString(it.expiry_date),
+        unit_cost: String(it.unit_cost || 0),
+      })),
+    );
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this GRN?")) return;
+    await grnApi.deleteById(id);
+    if (editingId === id) resetForm();
+    loadGRNs();
+  };
+
+  const getInputStyle = (fieldName) => {
+    return errors[fieldName] ? inputErrorStyle : inputStyle;
   };
 
   return (
@@ -172,25 +529,43 @@ export default function GRNPage() {
               GRN No
               <input
                 style={inputStyle}
-                name="grn_no"
-                value={header.grn_no}
-                onChange={handleHeaderChange}
-                required
+                value={
+                  editingId ? header.grn_no : header.grn_no || "Auto Generated"
+                }
+                disabled
               />
             </label>
             <label style={labelStyle}>
-              GRN Date
+              GRN Date *
               <input
-                style={inputStyle}
+                style={getInputStyle("grn_date")}
                 type="date"
                 name="grn_date"
                 value={header.grn_date}
                 onChange={handleHeaderChange}
+                max={getTodayDate()}
                 required
               />
+              {errors.grn_date && (
+                <div style={errorTextStyle}>{errors.grn_date}</div>
+              )}
             </label>
             <label style={labelStyle}>
-              PO
+              Location Id
+              <input
+                style={inputStyle}
+                type="number"
+                name="location_id"
+                value={header.location_id}
+                onChange={handleHeaderChange}
+                min="1"
+              />
+            </label>
+          </div>
+
+          <div style={formRowStyle}>
+            <label style={labelStyle}>
+              PO *
               <select
                 style={inputStyle}
                 value={selectedPoId}
@@ -198,18 +573,17 @@ export default function GRNPage() {
                 required
               >
                 <option value="">Select PO</option>
-                {poList.map((po) => (
-                  <option key={po.id} value={po.id}>
-                    {po.po_no} - {po.vendor_name}
-                  </option>
-                ))}
+                {poList
+                  .filter((po) => po.status !== "COMPLETED") // hide fully received POs
+                  .map((po) => (
+                    <option key={po.id} value={po.id}>
+                      {po.po_no} - {po.vendor_name}
+                    </option>
+                  ))}
               </select>
             </label>
-          </div>
-
-          <div style={formRowStyle}>
             <label style={labelStyle}>
-              Vendor (read-only)
+              Vendor
               <select
                 style={inputStyle}
                 name="vendor_id"
@@ -226,14 +600,17 @@ export default function GRNPage() {
               </select>
             </label>
             <label style={labelStyle}>
-              Location Id
-              <input
+              Status
+              <select
                 style={inputStyle}
-                type="number"
-                name="location_id"
-                value={header.location_id}
+                name="status"
+                value={header.status}
                 onChange={handleHeaderChange}
-              />
+              >
+                <option value="POSTED">POSTED</option>
+                <option value="CANCELLED">CANCELLED</option>
+                <option value="DRAFT">DRAFT</option>
+              </select>
             </label>
           </div>
 
@@ -243,96 +620,291 @@ export default function GRNPage() {
                 style={{
                   fontSize: "13px",
                   fontWeight: 500,
-                  margin: "8px 0"
+                  margin: "8px 0",
                 }}
               >
-                GRN Lines
+                GRN Lines *
               </div>
-              {items.map((it, idx) => (
-                <div key={idx} style={formRowStyle}>
-                  <label style={labelStyle}>
-                    Material ID
-                    <input
-                      style={inputStyle}
-                      value={it.material_id}
-                      disabled
-                    />
-                  </label>
-                  <label style={labelStyle}>
-                    Received
-                    <input
-                      style={inputStyle}
-                      type="number"
-                      value={it.received_qty}
-                      onChange={(e) =>
-                        handleItemChange(idx, "received_qty", e.target.value)
-                      }
-                    />
-                  </label>
-                  <label style={labelStyle}>
-                    Accepted
-                    <input
-                      style={inputStyle}
-                      type="number"
-                      value={it.accepted_qty}
-                      onChange={(e) =>
-                        handleItemChange(idx, "accepted_qty", e.target.value)
-                      }
-                    />
-                  </label>
-                  <label style={labelStyle}>
-                    Rejected
-                    <input
-                      style={inputStyle}
-                      type="number"
-                      value={it.rejected_qty}
-                      onChange={(e) =>
-                        handleItemChange(idx, "rejected_qty", e.target.value)
-                      }
-                    />
-                  </label>
-                  <label style={labelStyle}>
-                    Batch No
-                    <input
-                      style={inputStyle}
-                      value={it.batch_no}
-                      onChange={(e) =>
-                        handleItemChange(idx, "batch_no", e.target.value)
-                      }
-                    />
-                  </label> 
-                  <label style={labelStyle}>
-                    Mfg Date
-                    <input
-                      style={inputStyle}
-                      type="date"
-                      value={it.mfg_date}
-                      onChange={(e) =>
-                        handleItemChange(idx, "mfg_date", e.target.value)
-                      }
-                    />
-                  </label>
-                  <label style={labelStyle}>
-                    Expiry Date
-                    <input
-                      style={inputStyle}
-                      type="date"
-                      value={it.expiry_date}
-                      onChange={(e) =>
-                        handleItemChange(idx, "expiry_date", e.target.value)
-                      }
-                    />
-                  </label>
-                </div>
-              ))}
+              {items.map((it, idx) => {
+                const received = Number(it.received_qty) || 0;
+                const accepted = Number(it.accepted_qty) || 0;
+                const rejected = Number(it.rejected_qty) || 0;
+                const isValidSum =
+                  Math.abs(accepted + rejected - received) <= 0.01;
+
+                return (
+                  <div
+                    key={idx}
+                    style={{
+                      marginBottom: "16px",
+                      padding: "8px",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "4px",
+                    }}
+                  >
+                    <div style={formRowStyle}>
+                      <label style={labelStyle}>
+                        Material ID
+                        <input
+                          style={inputStyle}
+                          value={it.material_id}
+                          disabled
+                        />
+                      </label>
+                      <label style={labelStyle}>
+                        Received Qty *
+                        <input
+                          style={getInputStyle(`item_${idx}_received_qty`)}
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={it.received_qty}
+                          disabled
+                        />
+                        {errors[`item_${idx}_received_qty`] && (
+                          <div style={errorTextStyle}>
+                            {errors[`item_${idx}_received_qty`]}
+                          </div>
+                        )}
+                      </label>
+                      <label style={labelStyle}>
+                        Accepted Qty *
+                        <input
+                          style={getInputStyle(`item_${idx}_accepted_qty`)}
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={it.accepted_qty}
+                          onChange={(e) =>
+                            handleItemChange(
+                              idx,
+                              "accepted_qty",
+                              e.target.value,
+                            )
+                          }
+                        />
+                        {errors[`item_${idx}_accepted_qty`] && (
+                          <div style={errorTextStyle}>
+                            {errors[`item_${idx}_accepted_qty`]}
+                          </div>
+                        )}
+                      </label>
+                      <label style={labelStyle}>
+                        Rejected Qty
+                        <input
+                          style={getInputStyle(`item_${idx}_rejected_qty`)}
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={it.rejected_qty}
+                          onChange={(e) =>
+                            handleItemChange(
+                              idx,
+                              "rejected_qty",
+                              e.target.value,
+                            )
+                          }
+                        />
+                        {errors[`item_${idx}_rejected_qty`] && (
+                          <div style={errorTextStyle}>
+                            {errors[`item_${idx}_rejected_qty`]}
+                          </div>
+                        )}
+                      </label>
+                    </div>
+
+                    <div style={formRowStyle}>
+                      <label style={labelStyle}>
+                        Batch No
+                        <input
+                          style={getInputStyle(`item_${idx}_batch_no`)}
+                          value={it.batch_no}
+                          onChange={(e) =>
+                            handleItemChange(idx, "batch_no", e.target.value)
+                          }
+                          placeholder="Letters, numbers, spaces and hyphens only"
+                        />
+                        {errors[`item_${idx}_batch_no`] && (
+                          <div style={errorTextStyle}>
+                            {errors[`item_${idx}_batch_no`]}
+                          </div>
+                        )}
+                      </label>
+                      <label style={labelStyle}>
+                        Mfg Date
+                        <input
+                          style={getInputStyle(`item_${idx}_mfg_date`)}
+                          type="date"
+                          value={it.mfg_date}
+                          onChange={(e) =>
+                            handleItemChange(idx, "mfg_date", e.target.value)
+                          }
+                          max={getTodayDate()}
+                        />
+                        {errors[`item_${idx}_mfg_date`] && (
+                          <div style={errorTextStyle}>
+                            {errors[`item_${idx}_mfg_date`]}
+                          </div>
+                        )}
+                      </label>
+                      <label style={labelStyle}>
+                        Expiry Date
+                        <input
+                          style={getInputStyle(`item_${idx}_expiry_date`)}
+                          type="date"
+                          value={it.expiry_date}
+                          onChange={(e) =>
+                            handleItemChange(idx, "expiry_date", e.target.value)
+                          }
+                          min={it.mfg_date || getTodayDate()}
+                        />
+                        {errors[`item_${idx}_expiry_date`] && (
+                          <div style={errorTextStyle}>
+                            {errors[`item_${idx}_expiry_date`]}
+                          </div>
+                        )}
+                      </label>
+                      <label style={labelStyle}>
+                        Unit Cost
+                        <input
+                          style={getInputStyle(`item_${idx}_unit_cost`)}
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={it.unit_cost}
+                          onChange={(e) =>
+                            handleItemChange(idx, "unit_cost", e.target.value)
+                          }
+                        />
+                        {errors[`item_${idx}_unit_cost`] && (
+                          <div style={errorTextStyle}>
+                            {errors[`item_${idx}_unit_cost`]}
+                          </div>
+                        )}
+                      </label>
+                    </div>
+
+                    {errors[`item_${idx}_qty_sum`] && (
+                      <div
+                        style={{
+                          ...errorTextStyle,
+                          marginLeft: "8px",
+                          backgroundColor: "#fee2e2",
+                          padding: "4px 8px",
+                          borderRadius: "4px",
+                        }}
+                      >
+                        ⚠️ {errors[`item_${idx}_qty_sum`]}
+                      </div>
+                    )}
+
+                    {isValidSum && accepted === received && rejected === 0 && (
+                      <div
+                        style={{
+                          marginLeft: "8px",
+                          marginTop: "4px",
+                          fontSize: "11px",
+                          color: "#10b981",
+                        }}
+                      >
+                        ✓ All quantities matched - Full receipt
+                      </div>
+                    )}
+
+                    {isValidSum && accepted < received && accepted > 0 && (
+                      <div
+                        style={{
+                          marginLeft: "8px",
+                          marginTop: "4px",
+                          fontSize: "11px",
+                          color: "#f59e0b",
+                        }}
+                      >
+                        ⚡ Partial receipt - {accepted} accepted, {rejected}{" "}
+                        rejected
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </>
           )}
 
-          <button type="submit" style={buttonStyle} disabled={!items.length}>
-            Save GRN
-          </button>
+          <div>
+            <button type="submit" style={buttonStyle} disabled={!items.length}>
+              {editingId ? "Update GRN" : "Save GRN"}
+            </button>
+            <button
+              type="button"
+              style={secondaryButtonStyle}
+              onClick={resetForm}
+            >
+              Cancel / Clear
+            </button>
+          </div>
         </form>
+      </div>
+
+      <div style={cardStyle}>
+        <div style={{ fontSize: "14px", fontWeight: 500, marginBottom: "8px" }}>
+          Existing GRNs
+        </div>
+        <table style={tableStyle}>
+          <thead>
+            <tr>
+              <th style={thStyle}>GRN No</th>
+              <th style={thStyle}>Date</th>
+              <th style={thStyle}>PO</th>
+              <th style={thStyle}>Vendor</th>
+              <th style={thStyle}>Location</th>
+              <th style={thStyle}>Status</th>
+              <th style={thStyle}>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {grns.map((g) => (
+              <tr key={g.id}>
+                <td style={tdStyle}>{g.grn_no}</td>
+                <td style={tdStyle}>{toLocalDateString(g.grn_date)}</td>
+                <td style={tdStyle}>{g.po_no}</td>
+                <td style={tdStyle}>{g.vendor_name}</td>
+                <td style={tdStyle}>{g.location_id}</td>
+                <td style={tdStyle}>{g.status}</td>
+                <td style={tdStyle}>
+                  <button
+                    style={{
+                      ...smallBtn,
+                      backgroundColor: "#2563eb",
+                      color: "#fff",
+                    }}
+                    onClick={() => handleEdit(g)}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    style={{
+                      ...smallBtn,
+                      backgroundColor: "#dc2626",
+                      color: "#fff",
+                    }}
+                    onClick={() => handleDelete(g.id)}
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {grns.length === 0 && (
+              <tr>
+                <td style={tdStyle} colSpan={7}>
+                  No GRNs found.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
 }
+

@@ -7,6 +7,7 @@ const invoiceApi = {
   create(data) {
     return axiosClient.post("/invoices", data);
   }
+  // later: releaseBlock(id) { return axiosClient.patch(`/invoices/${id}/release-block`); }
 };
 
 export default invoiceApi;

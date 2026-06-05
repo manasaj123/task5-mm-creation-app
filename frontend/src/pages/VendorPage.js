@@ -21,6 +21,7 @@ const cardStyle = {
 export default function VendorPage() {
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [editingVendor, setEditingVendor] = useState(null);
 
   const loadData = async () => {
     try {
@@ -40,11 +41,25 @@ export default function VendorPage() {
 
   const handleSave = async (form) => {
     try {
-      await vendorApi.create(form);
+      if (editingVendor) {
+        await vendorApi.update(editingVendor.id, form);
+        setEditingVendor(null);
+      } else {
+        await vendorApi.create(form);
+      }
       await loadData();
     } catch (e) {
       console.error(e);
+      throw e;
     }
+  };
+
+  const handleEdit = (vendor) => {
+    setEditingVendor(vendor);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingVendor(null);
   };
 
   return (
@@ -52,14 +67,19 @@ export default function VendorPage() {
       <div style={titleStyle}>Vendors / Farmers</div>
 
       <div style={cardStyle}>
-        <VendorForm onSave={handleSave} />
+        <VendorForm 
+          onSave={handleSave} 
+          editingVendor={editingVendor}
+          onCancelEdit={handleCancelEdit}
+          existingVendors={vendors}
+        />
       </div>
 
       <div style={cardStyle}>
         {loading ? (
           <div style={{ fontSize: "13px" }}>Loading...</div>
         ) : (
-          <VendorList data={vendors} />
+          <VendorList data={vendors} onEdit={handleEdit} />
         )}
       </div>
     </div>

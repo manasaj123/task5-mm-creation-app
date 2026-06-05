@@ -12,7 +12,10 @@ const appContainerStyle = {
 const sidebarContainerStyle = {
   width: "220px",
   backgroundColor: "#1f2933",
-  color: "#fff"
+  color: "#fff",
+  display: "flex",             
+  flexDirection: "column",
+  alignSelf: "stretch" 
 };
 
 const mainContainerStyle = {

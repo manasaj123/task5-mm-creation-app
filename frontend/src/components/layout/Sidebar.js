@@ -2,12 +2,15 @@ import React from "react";
 import { NavLink } from "react-router-dom";
 
 const sidebarStyle = {
-  height: "100vh",
   display: "flex",
   flexDirection: "column",
   padding: "16px",
-  boxSizing: "border-box"
+  boxSizing: "border-box",
+   height: "100%", 
+   overflowY: "auto"
 };
+
+
 
 const logoStyle = {
   fontSize: "18px",
@@ -27,7 +30,8 @@ const navItemStyle = {
 const activeNavItemStyle = {
   ...navItemStyle,
   backgroundColor: "#374151",
-  color: "#ffffff"
+  color: "#ffffff",
+  
 };
 
 const groupTitleStyle = {
@@ -66,6 +70,12 @@ export default function Sidebar() {
         Purchase Requisitions
       </NavLink>
       <NavLink
+        to="/rfq"
+        style={({ isActive }) => (isActive ? activeNavItemStyle : navItemStyle)}
+      >
+        Request for Quotation
+      </NavLink>
+      <NavLink
         to="/po"
         style={({ isActive }) => (isActive ? activeNavItemStyle : navItemStyle)}
       >
@@ -76,6 +86,12 @@ export default function Sidebar() {
         style={({ isActive }) => (isActive ? activeNavItemStyle : navItemStyle)}
       >
         Goods Receipt
+      </NavLink>
+        <NavLink
+        to="/gi"
+        style={({ isActive }) => (isActive ? activeNavItemStyle : navItemStyle)}
+      >
+        Goods issue
       </NavLink>
 
       <div style={groupTitleStyle}>Inventory</div>
@@ -91,7 +107,7 @@ export default function Sidebar() {
         to="/invoices"
         style={({ isActive }) => (isActive ? activeNavItemStyle : navItemStyle)}
       >
-        Vendor Invoices
+        Invoice Verification
       </NavLink>
 
       <div style={groupTitleStyle}>Planning</div>

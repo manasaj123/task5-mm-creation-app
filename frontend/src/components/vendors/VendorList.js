@@ -27,7 +27,26 @@ const badgeStyle = (type) => ({
   color: "#ffffff"
 });
 
-export default function VendorList({ data }) {
+const editButtonStyle = {
+  padding: "4px 8px",
+  fontSize: "11px",
+  borderRadius: "4px",
+  border: "none",
+  backgroundColor: "#2563eb",
+  color: "#ffffff",
+  cursor: "pointer"
+};
+
+const statusBadgeStyle = (status) => ({
+  display: "inline-block",
+  padding: "2px 6px",
+  borderRadius: "999px",
+  fontSize: "11px",
+  backgroundColor: status === "ACTIVE" ? "#10b981" : "#ef4444",
+  color: "#ffffff"
+});
+
+export default function VendorList({ data, onEdit }) {
   if (!data || data.length === 0) {
     return <div style={{ fontSize: "13px", color: "#6b7280" }}>No vendors found.</div>;
   }
@@ -42,6 +61,7 @@ export default function VendorList({ data }) {
           <th style={thStyle}>GST</th>
           <th style={thStyle}>Status</th>
           <th style={thStyle}>Rating</th>
+          <th style={thStyle}>Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -53,8 +73,15 @@ export default function VendorList({ data }) {
             </td>
             <td style={tdStyle}>{v.contact}</td>
             <td style={tdStyle}>{v.gst_no}</td>
-            <td style={tdStyle}>{v.status}</td>
-            <td style={tdStyle}>{v.rating}</td>
+            <td style={tdStyle}>
+              <span style={statusBadgeStyle(v.status)}>{v.status}</span>
+            </td>
+            <td style={tdStyle}>{v.rating}★</td>
+            <td style={tdStyle}>
+              <button style={editButtonStyle} onClick={() => onEdit(v)}>
+                Edit
+              </button>
+            </td>
           </tr>
         ))}
       </tbody>

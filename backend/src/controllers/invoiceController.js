@@ -14,85 +14,120 @@ export const createInvoice = async (req, res, next) => {
   const conn = await db.getConnection();
   try {
     const { header, items } = req.body;
+
     await conn.beginTransaction();
 
-    const [hRes] = await conn.query(
-      `INSERT INTO vendor_invoices
-       (invoice_no, invoice_date, vendor_id, po_id, total_amount, status)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [
-        header.invoice_no,
-        header.invoice_date,
-        header.vendor_id,
-        header.po_id,
-        header.total_amount,
-        "PENDING"
-      ]
+    // 1️⃣ Generate invoice number
+    const [rows] = await conn.query(
+      `SELECT invoice_no FROM vendor_invoices
+       WHERE invoice_no LIKE 'INV-%'
+       ORDER BY id DESC LIMIT 1`
     );
-    const invId = hRes.insertId;
 
+    let nextSeq = 1;
+    if (rows.length) {
+      const num = Number(rows[0].invoice_no.split("-")[1]);
+      if (!isNaN(num)) nextSeq = num + 1;
+    }
+    const invoiceNo = `INV-${String(nextSeq).padStart(3, "0")}`;
+
+    const isGRBased = header.gr_based !== false;
+
+    // 2️⃣ Insert header
+    const [hRes] = await Invoice.createHeader(
+      {
+        ...header,
+        invoice_no: invoiceNo,
+        status: "PENDING",
+        gr_based: isGRBased,
+        payment_blocked: header.payment_blocked ? 1 : 0
+      },
+      conn
+    );
+
+    const invoiceId = hRes.insertId;
     let hasMismatch = false;
 
+    // 3️⃣ Process items
     for (const item of items || []) {
-      const qty = Number(item.qty) || 0;
-      const price = Number(item.price) || 0;
+      let { po_item_id, material_id, qty, price, tax_percent } = item;
 
-      // 1) get PO line
-      const [[po]] = await conn.query(
-        `SELECT qty, price
-         FROM po_items
-         WHERE id = ?`,
-        [item.po_item_id]
-      );
+      qty = Number(qty) || 0;
+      price = Number(price) || 0;
 
-      // 2) get total GRN qty for this PO item
-      const [[gr]] = await conn.query(
-  `SELECT COALESCE(SUM(received_qty), 0) AS grn_qty
-   FROM grn_items
-   WHERE po_item_id = ?`,
-  [item.po_item_id]
-);
+      // 🔹 If PO item exists → derive material from PO
+      if (po_item_id) {
+        const [[po]] = await conn.query(
+          `SELECT qty, price, material_id
+           FROM po_items WHERE id = ?`,
+          [po_item_id]
+        );
 
+        if (!po) {
+          throw new Error(`Invalid PO item: ${po_item_id}`);
+        }
 
-      const poQty = Number(po?.qty || 0);
-      const poPrice = Number(po?.price || 0);
-      const grnQty = Number(gr?.grn_qty || 0);
+        material_id = po.material_id;
 
-      // 3) basic 3-way matching checks
-      const qtyOk = qty <= grnQty && grnQty <= poQty;
-      const priceOk = price === poPrice; // or allow tolerance
+        const [[gr]] = await conn.query(
+          `SELECT COALESCE(SUM(received_qty),0) grn_qty
+           FROM grn_items WHERE po_item_id = ?`,
+          [po_item_id]
+        );
 
-      if (!qtyOk || !priceOk) {
-        hasMismatch = true;
+        const grnQty = Number(gr.grn_qty);
+        if (isGRBased && qty > grnQty) hasMismatch = true;
+        if (price !== Number(po.price)) hasMismatch = true;
       }
 
-      // 4) insert invoice line
-      await conn.query(
-        `INSERT INTO invoice_items
-         (invoice_id, po_item_id, material_id, qty, price, tax_percent)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [
-          invId,
-          item.po_item_id,
-          item.material_id,
+      // 🔴 Final hard validation
+      if (!material_id) {
+        throw new Error("Material is mandatory for invoice line");
+      }
+
+      // 4️⃣ Insert item
+      await Invoice.createItem(
+        {
+          po_item_id: po_item_id || null,
+          material_id,
           qty,
           price,
-          item.tax_percent || 0
-        ]
+          tax_percent: Number(tax_percent) || 0
+        },
+        invoiceId,
+        conn
       );
     }
 
-    // 5) set invoice status based on match result
-    const status = hasMismatch ? "MISMATCH" : "VERIFIED";
+    // 5️⃣ Status decision
+    let status = "VERIFIED";
+    let paymentBlocked = 0;
+
+    if (hasMismatch) {
+      status = "BLOCKED_DUE_TO_VARIANCE";
+      paymentBlocked = 1;
+    }
+
+    if (header.payment_blocked) {
+      paymentBlocked = 1;
+      if (status === "VERIFIED") status = "BLOCKED_MANUAL";
+    }
+
     await conn.query(
       `UPDATE vendor_invoices
-       SET status = ?
+       SET status = ?, payment_blocked = ?
        WHERE id = ?`,
-      [status, invId]
+      [status, paymentBlocked, invoiceId]
     );
 
     await conn.commit();
-    res.status(201).json({ id: invId, status });
+
+    res.status(201).json({
+      id: invoiceId,
+      invoice_no: invoiceNo,
+      status,
+      payment_blocked: !!paymentBlocked
+    });
   } catch (err) {
     await conn.rollback();
     next(err);

@@ -10,6 +10,9 @@ import StockPage from "../pages/StockPage";
 import InvoicePage from "../pages/InvoicePage";
 import PlanningPage from "../pages/PlanningPage";
 import StockTransferPage  from "../pages/StockTransferPage";
+import RequestForQuotationPage from "../pages/RequestForQuotationPage";
+
+import GoodsissuePage from "../pages/GoodsissuePage";
 
 
 export default function AppRouter() {
@@ -25,6 +28,8 @@ export default function AppRouter() {
       <Route path="/invoices" element={<InvoicePage />} />
       <Route path="/planning" element={<PlanningPage />} />
       <Route path="/stock-transfer" element={<StockTransferPage />} />
+      <Route path="/rfq" element={<RequestForQuotationPage />} />
+      <Route path="/gi" element={<GoodsissuePage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
