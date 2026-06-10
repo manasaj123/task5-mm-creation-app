@@ -140,6 +140,7 @@ export default function GoodsissuePage() {
   const [selectedPoId, setSelectedPoId] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [errors, setErrors] = useState({});
+  const [viewGI, setViewGI] = useState(null);
   const [batchesByItem, setBatchesByItem] = useState({}); // { itemIndex: { batches: [], selectedBatchId } }
 
   const [header, setHeader] = useState({
@@ -461,6 +462,14 @@ export default function GoodsissuePage() {
       })),
     );
   };
+  const handleView = async (gi) => {
+  const res = await giApi.getById(gi.id);
+  setViewGI(res.data);
+};
+
+const closeView = () => {
+  setViewGI(null);
+};
 
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this Goods Issue?")) return;
@@ -483,6 +492,7 @@ export default function GoodsissuePage() {
   };
 
   return (
+    <>
     <div>
       <div style={titleStyle}>Goods Issue</div>
 
@@ -792,6 +802,16 @@ export default function GoodsissuePage() {
                     Edit
                   </button>
                   <button
+  style={{
+    ...smallBtn,
+    backgroundColor: "#10b981",
+    color: "#fff",
+  }}
+  onClick={() => handleView(g)}
+>
+  View
+</button>
+                  <button
                     style={{
                       ...smallBtn,
                       backgroundColor: "#dc2626",
@@ -815,5 +835,80 @@ export default function GoodsissuePage() {
         </table>
       </div>
     </div>
+    
+    {viewGI && (
+  <div
+    style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      width: "100%",
+      height: "100%",
+      backgroundColor: "rgba(0,0,0,0.5)",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 9999,
+    }}
+  >
+    <div
+      style={{
+        backgroundColor: "#fff",
+        padding: "20px",
+        borderRadius: "8px",
+        width: "600px",
+        maxHeight: "80vh",
+        overflowY: "auto",
+      }}
+    >
+      <h3>Goods Issue Details</h3>
+
+      <p><b>GI No:</b> {viewGI.header?.gi_no}</p>
+      <p><b>PO:</b> {viewGI.header?.po_id}</p>
+      <p><b>Plant:</b> {viewGI.header?.plant}</p>
+      <p><b>Status:</b> {viewGI.header?.status}</p>
+
+      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <thead>
+          <tr>
+            <th style={{ border: "1px solid #ddd", padding: "5px" }}>Material</th>
+            <th style={{ border: "1px solid #ddd", padding: "5px" }}>Qty</th>
+            <th style={{ border: "1px solid #ddd", padding: "5px" }}>Storage</th>
+          </tr>
+        </thead>
+        <tbody>
+          {(viewGI.items || []).map((item, index) => (
+            <tr key={index}>
+              <td style={{ border: "1px solid #ddd", padding: "5px" }}>
+                {item.material_id}
+              </td>
+              <td style={{ border: "1px solid #ddd", padding: "5px" }}>
+                {item.qty}
+              </td>
+              <td style={{ border: "1px solid #ddd", padding: "5px" }}>
+                {item.storage_location}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <button
+        style={{
+          marginTop: "15px",
+          padding: "8px 12px",
+          backgroundColor: "#dc2626",
+          color: "#fff",
+          border: "none",
+          borderRadius: "4px",
+        }}
+        onClick={closeView}
+      >
+        Close
+      </button>
+    </div>
+  </div>
+)}
+</>
   );
 }

@@ -126,6 +126,7 @@ export default function GRNPage() {
   const [selectedPoId, setSelectedPoId] = useState("");
   const [vendors, setVendors] = useState([]);
   const [editingId, setEditingId] = useState(null);
+  const [viewGRN, setViewGRN] = useState(null);
   const [errors, setErrors] = useState({});
 
   const [header, setHeader] = useState({
@@ -507,6 +508,15 @@ export default function GRNPage() {
     );
   };
 
+  const handleView = async (grn) => {
+  const res = await grnApi.getById(grn.id);
+  setViewGRN(res.data);
+};
+
+const closeView = () => {
+  setViewGRN(null);
+};
+
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this GRN?")) return;
     await grnApi.deleteById(id);
@@ -519,6 +529,8 @@ export default function GRNPage() {
   };
 
   return (
+    <>
+    
     <div>
       <div style={titleStyle}>Goods Receipt (GRN)</div>
 
@@ -633,6 +645,7 @@ export default function GRNPage() {
                   Math.abs(accepted + rejected - received) <= 0.01;
 
                 return (
+                  
                   <div
                     key={idx}
                     style={{
@@ -882,6 +895,16 @@ export default function GRNPage() {
                     Edit
                   </button>
                   <button
+  style={{
+    ...smallBtn,
+    backgroundColor: "#10b981",
+    color: "#fff",
+  }}
+  onClick={() => handleView(g)}
+>
+  View
+</button>
+                  <button
                     style={{
                       ...smallBtn,
                       backgroundColor: "#dc2626",
@@ -905,5 +928,80 @@ export default function GRNPage() {
         </table>
       </div>
     </div>
+    
+    {viewGRN && (
+  <div
+    style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      width: "100%",
+      height: "100%",
+      backgroundColor: "rgba(0,0,0,0.5)",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 9999,
+    }}
+  >
+    <div
+      style={{
+        backgroundColor: "#fff",
+        padding: "20px",
+        borderRadius: "8px",
+        width: "700px",
+        maxHeight: "80vh",
+        overflowY: "auto",
+      }}
+    >
+      <h3>GRN Details</h3>
+
+      <p><b>GRN No:</b> {viewGRN.header?.grn_no}</p>
+      <p><b>PO:</b> {viewGRN.header?.po_id}</p>
+      <p><b>Vendor:</b> {viewGRN.header?.vendor_name}</p>
+      <p><b>Status:</b> {viewGRN.header?.status}</p>
+
+      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <thead>
+          <tr>
+            <th style={{ border: "1px solid #ddd", padding: "5px" }}>Material</th>
+            <th style={{ border: "1px solid #ddd", padding: "5px" }}>Qty</th>
+            <th style={{ border: "1px solid #ddd", padding: "5px" }}>Batch</th>
+          </tr>
+        </thead>
+        <tbody>
+          {(viewGRN.items || []).map((item, index) => (
+            <tr key={index}>
+              <td style={{ border: "1px solid #ddd", padding: "5px" }}>
+                {item.material_id}
+              </td>
+              <td style={{ border: "1px solid #ddd", padding: "5px" }}>
+                {item.qty}
+              </td>
+              <td style={{ border: "1px solid #ddd", padding: "5px" }}>
+                {item.batch_no}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <button
+        style={{
+          marginTop: "15px",
+          padding: "8px 12px",
+          backgroundColor: "#dc2626",
+          color: "#fff",
+          border: "none",
+          borderRadius: "4px",
+        }}
+        onClick={closeView}
+      >
+        Close
+      </button>
+    </div>
+  </div>
+)}
+</>
   );
 }
